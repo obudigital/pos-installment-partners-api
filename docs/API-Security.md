@@ -38,7 +38,7 @@ Token должен передаваться в Authorization Header при ка�
 X-Signature = base64(HMAC(Key, Message)), где
 
 Key = {APISecret},
-Message = X-Request-ID + URI + Content Body
+Message = X-Request-Id + URI + Content Body
 Algorithm - SHA256
 
 #### Примеры формирования Message

@@ -2,4 +2,4 @@
 
 ## Sequence Diagram
 
-![Stoplight Logo](../images/pos-installment-partners-api.svg)
+![Stoplight Logo](../images/pos-installment-partners-api.png)
