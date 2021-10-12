@@ -1,0 +1,665 @@
+openapi: 3.1.0
+info:
+  title: Partner API for POS Installments
+  version: '1.0'
+  summary: Partner API for POS Installments
+  description: ''
+  contact:
+    name: Maksym Volchenko
+    email: maksym.volchenko@otpbank.ua
+servers:
+  - url: 'http://test.obudev.in'
+    description: Stage
+  - url: 'http://api.otpbank.com.ua:8080'
+    description: Prod
+paths:
+  /partner/installments/orders:
+    post:
+      summary: Create POS Installment Order
+      operationId: post-partner-installments-orders
+      security:
+        - Authorization: []
+      parameters:
+        - $ref: '#/components/parameters/X-MerchantId'
+        - $ref: '#/components/parameters/X-Signature'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: integer
+                    description: ID заказа в Банке
+                required:
+                  - orderId
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phoneNumber:
+                  $ref: '#/components/schemas/TelephoneNumber'
+                storeOrder:
+                  $ref: '#/components/schemas/StoreOrder'
+                totalAmount:
+                  $ref: ./schemas/Amount.v1.yaml
+                vatAmount:
+                  $ref: ./schemas/Amount.v1.yaml
+                periodsChosen:
+                  type: integer
+                onSuccessCallbackURI:
+                  type: string
+                  format: uri
+                  description: 'URI в разрешенном базовом домене, привязнному к аккаунту партнера. Может отличаться между средами production и testing'
+                  example: /path/to/success
+                onFailCallbackURI:
+                  type: string
+                  format: uri
+              required:
+                - phoneNumber
+                - storeOrder
+                - totalAmount
+                - periodsChosen
+        description: ''
+      description: Подача заявки на оформление покупки частями
+    get:
+      summary: GET All POS-Installment Orders
+      operationId: get-partner-installments-orders
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PosInstallmentPartner'
+      description: Получение списка всех POS-installments
+      parameters:
+        - $ref: '#/components/parameters/X-MerchantId'
+        - $ref: '#/components/parameters/X-Signature'
+      security:
+        - Authorization: []
+  '/partner/installments/orders/{orderid}/state':
+    parameters:
+      - schema:
+          type: integer
+        name: orderid
+        in: path
+        required: true
+    get:
+      summary: Your GET endpoint
+      tags: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    $ref: '#/components/schemas/InstallmentOrderState'
+                  totalAmount:
+                    $ref: ./schemas/Amount.v1.yaml
+                  storeOrderId:
+                    type: string
+                required:
+                  - state
+                  - totalAmount
+                  - storeOrderId
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      operationId: get-partner-installments-orders-orderid-state
+      security:
+        - Authorization: []
+      parameters:
+        - $ref: '#/components/parameters/X-MerchantId'
+        - $ref: '#/components/parameters/X-Signature'
+      description: Получение состояния ранее созданной заявки на оформление покупки частями (pull модель вместо callback push модели)
+  '/partner/installments/orders/{orderid}/state/sent':
+    parameters:
+      - schema:
+          type: integer
+        name: orderid
+        in: path
+        required: true
+    post:
+      summary: Notify that Order is sent
+      operationId: post-partner-installments-orders-orderid-state-sent
+      security:
+        - Authorization: []
+      parameters:
+        - $ref: '#/components/parameters/X-MerchantId'
+        - $ref: '#/components/parameters/X-Signature'
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      description: |-
+        Получение статуса отправлен, инцирует процесс клиринга между партнером и Банком
+
+        Банк активирует рассрочку для Клиента
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sentAt:
+                  type: string
+                  format: date-time
+              required:
+                - sentAt
+  '/partner/installments/orders/{orderid}/state/cancelled':
+    parameters:
+      - schema:
+          type: string
+        name: orderid
+        in: path
+        required: true
+    post:
+      summary: Cancel Order
+      operationId: post-partner-installments-orders-orderid-state-cancelled
+      security:
+        - Authorization: []
+      parameters:
+        - schema:
+            type: integer
+          in: header
+          name: X-PartnerId
+          required: true
+        - schema:
+            type: integer
+          in: header
+          name: X-MerchantId
+        - schema:
+            type: integer
+          in: header
+          name: X-KeyId
+          required: true
+        - schema:
+            type: string
+            format: byte
+          in: header
+          name: X-Signature
+          required: true
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      description: Заказ может быть отменен только в статусе WAITING_DELIVERY
+  '/partner/installments/orders/{orderid}/state/returned':
+    parameters:
+      - schema:
+          type: string
+        name: orderid
+        in: path
+        required: true
+    post:
+      summary: Return goods
+      operationId: post-partner-installments-orders-orderid-state-returned
+      security:
+        - Authorization: []
+      parameters:
+        - $ref: '#/components/parameters/X-MerchantId'
+        - $ref: '#/components/parameters/X-Signature'
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                storeReturnId:
+                  type: string
+                  description: Идентификатор возврата на стороне магазина
+                returnedAt:
+                  type: string
+                  format: date-time
+                returnAmount:
+                  $ref: ./schemas/Amount.v1.yaml
+                vatAmount:
+                  $ref: ./schemas/Amount.v1.yaml
+              required:
+                - storeReturnId
+                - returnedAt
+                - returnAmount
+      description: Возврат товара возможен только в течение 14 дней с даты отправки заказа (sentAt)
+  '/partner/installments/orders/{orderid}/guaranteeLetter':
+    parameters:
+      - schema:
+          type: integer
+        name: orderid
+        in: path
+        required: true
+    get:
+      summary: Your GET endpoint
+      tags: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  header:
+                    type: object
+                    properties:
+                      requestId:
+                        type: string
+                        description: '???'
+                      answerDatetime:
+                        type: string
+                        format: date-time
+                        description: '???'
+                      fromOrganization:
+                        type: string
+                      organizationId:
+                        type: string
+                        description: digits. налоговый id или по нашей системе?
+                  expansion:
+                    type: object
+                    properties:
+                      customer:
+                        type: object
+                        properties:
+                          lastName:
+                            type: string
+                          firstName:
+                            type: string
+                          middleName:
+                            type: string
+                          docType:
+                            type: string
+                            description: '????'
+                          docSeries:
+                            type: string
+                            minLength: 2
+                            maxLength: 2
+                          docNumber:
+                            type: string
+                            pattern: '^[0-9]{6}$'
+                            minLength: 6
+                            maxLength: 6
+                          docIssued:
+                            type: string
+                            description: кем выдан
+                          docDateOfIssue:
+                            type: string
+                            format: date
+                          INN:
+                            type: string
+                            pattern: '^[0-9]{10}$'
+                            minLength: 10
+                            maxLength: 10
+                      invoice:
+                        type: object
+                        properties:
+                          invoiceId:
+                            type: string
+                          invoiceDate:
+                            type: string
+                            format: date
+                          invoiceAmount:
+                            $ref: ./schemas/Amount.v1.yaml
+                      paymentDestination:
+                        type: object
+                        properties:
+                          destId:
+                            type: string
+                            description: digits ??
+                          destName:
+                            type: string
+                            description: кому платить (юр лицо партнера)
+                          destMFO:
+                            type: string
+                            minLength: 6
+                            maxLength: 6
+                            pattern: '^[0-9]{6}$'
+                          destBankName:
+                            type: string
+                          destAccNumber:
+                            type: string
+                            pattern: '^[0-9]*$'
+                      bank:
+                        type: object
+                        properties:
+                          agreement:
+                            type: string
+                            description: код договора
+                          agreementDate:
+                            type: string
+                            description: дата заключения договора
+                          creditAmount:
+                            $ref: ./schemas/Amount.v1.yaml
+                          productTypes:
+                            type: string
+                            description: '"БР" ????'
+                          availablePartsCount:
+                            type: integer
+                            minimum: 1
+                          bankId:
+                            type: string
+                            pattern: '^[0-9]*$'
+                            description: '???? например 21133352'
+                          bankName:
+                            type: string
+                          bankExecutive:
+                            type: string
+                      sign:
+                        type: string
+                        pattern: '0[xX][0-9a-fA-F]+'
+                        description: hex
+                      stamp:
+                        type: string
+                        pattern: '0[xX][0-9a-fA-F]+'
+                        description: hex
+            application/xml:
+              schema:
+                type: object
+                properties: {}
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      operationId: get-partner-installments-orders-orderid-guaranteeLetter
+      security:
+        - Authorization: []
+      parameters:
+        - $ref: '#/components/parameters/X-MerchantId'
+        - $ref: '#/components/parameters/X-Signature'
+components:
+  schemas:
+    Error:
+      description: Universal Error
+      type: object
+      properties:
+        errorCode:
+          type: integer
+          exclusiveMinimum: 0
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - errorCode
+        - name
+    PosInstallmentPartner:
+      title: PosInstallmentPartner
+      type: object
+      properties:
+        installmentId:
+          type: integer
+        status:
+          $ref: '#/components/schemas/InstallmentOrderState'
+        totalAmount:
+          $ref: ./schemas/Amount.v1.yaml
+        totalPeriods:
+          type: integer
+      required:
+        - installmentId
+        - status
+    Product:
+      title: Product
+      type: object
+      description: Purchased product (item of an installment order)
+      properties:
+        name:
+          type: string
+        totalAmount:
+          $ref: ./schemas/Amount.v1.yaml
+        count:
+          type: integer
+          exclusiveMinimum: 0
+        category:
+          type: string
+      required:
+        - name
+        - totalAmount
+        - count
+    StoreOrder:
+      title: StoreOrder
+      type: object
+      properties:
+        storeId:
+          type: string
+          description: Идентификатор торговой точки внутри сети партнера
+        orderNumber:
+          type: string
+          description: Уникальный идентификатор транзакции на стороне магазина. Нужен для отсечения дублиикатов
+        invoiceNumber:
+          type: string
+          description: Номер чека/счета фактуры
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата создания счета-фактуры
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        source:
+          type: string
+          enum:
+            - STORE
+            - INTERNET
+      required:
+        - orderNumber
+        - invoiceNumber
+        - createdAt
+        - products
+        - source
+    TelephoneNumber:
+      type: string
+      title: PhoneNumber
+      pattern: '^380\d{9}$'
+      minLength: 12
+      maxLength: 12
+    PANLast4Digits:
+      type: string
+      title: PANLast4Digits
+      pattern: '^\d{4}$'
+      minLength: 4
+      maxLength: 4
+    InstallmentOrderState:
+      type: string
+      title: InstallmentOrderState
+      enum:
+        - WAITING_DELIVERY
+        - ACTIVE
+        - CLOSED
+        - CLIENT_CANCELLED
+        - BANK_REJECTED
+        - WAITING_CLIENT_APPROVAL
+        - STORE_CANCELLED
+    PartnerTurnoverReport:
+      title: PartnerTurnoverReport
+      type: object
+      properties:
+        orderId:
+          type: string
+          description: Идентификатор ПЧ
+        commission:
+          $ref: ./schemas/Amount.v1.yaml
+        commissionPercent:
+          type: integer
+          minimum: 0
+          description: '% комиссии'
+        invoiceId:
+          type: string
+          description: № счета фактуры
+        invoiceDate:
+          type: string
+          format: date
+          description: 'Дата счета фактуры. Формат: yyyy-MM-dd'
+        odbContractNumber:
+          type: string
+          description: Номер кредитного договора
+        operationDateTime:
+          type: string
+          format: date-time
+        payParts:
+          type: integer
+          minimum: 1
+        totalAmount:
+          $ref: ./schemas/Amount.v1.yaml
+        transferredAmount:
+          $ref: ./schemas/Amount.v1.yaml
+      required:
+        - orderId
+        - commission
+        - commissionPercent
+        - invoiceId
+        - invoiceDate
+        - odbContractNumber
+        - operationDateTime
+        - payParts
+        - totalAmount
+        - transferredAmount
+  securitySchemes:
+    Authorization:
+      type: http
+      scheme: bearer
+      in: header
+      description: ''
+  parameters:
+    X-MerchantId:
+      name: X-MerchantId
+      in: header
+      required: true
+      schema:
+        type: string
+      description: 'ID мерчанта - юридического лица, с которым заключен договор'
+    X-Signature:
+      name: X-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+        format: binary
+      description: See docs
+security:
+  - Authorization: []

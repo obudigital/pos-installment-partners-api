@@ -1,0 +1,18 @@
+title: Amount
+type: object
+properties:
+  value:
+    type: number
+    format: double
+  currency:
+    type: string
+    enum:
+      - UAH
+      - USD
+      - EUR
+    example: UAH
+    minLength: 3
+    maxLength: 3
+required:
+  - value
+  - currency
