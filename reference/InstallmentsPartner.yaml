@@ -3,13 +3,13 @@ info:
   title: Partner API for POS Installments
   version: '1.0'
   summary: Partner API for POS Installments
-  description: ''
+  description: Partner API for POS Installments
   contact:
     name: Maksym Volchenko
     email: maksym.volchenko@otpbank.ua
 servers:
   - url: 'http://test.obudev.in'
-    description: Stage
+    description: Test
   - url: 'http://api.otpbank.com.ua:8080'
     description: Prod
 paths:
@@ -72,19 +72,23 @@ paths:
                 storeOrder:
                   $ref: '#/components/schemas/StoreOrder'
                 totalAmount:
-                  $ref: ./schemas/Amount.v1.yaml
+                  $ref: '#/components/schemas/Amount'
                 vatAmount:
-                  $ref: ./schemas/Amount.v1.yaml
+                  $ref: '#/components/schemas/Amount'
                 periodsChosen:
                   type: integer
+                  maximum: 24
+                  exclusiveMinimum: 1
+                  example: 6
                 onSuccessCallbackURI:
                   type: string
-                  format: uri
+                  format: uri-reference
                   description: 'URI в разрешенном базовом домене, привязнному к аккаунту партнера. Может отличаться между средами production и testing'
                   example: /path/to/success
                 onFailCallbackURI:
                   type: string
-                  format: uri
+                  format: uri-reference
+                  example: /path/to/failed
               required:
                 - phoneNumber
                 - storeOrder
@@ -106,7 +110,7 @@ paths:
                   orders:
                     type: array
                     items:
-                      $ref: '#/components/schemas/PosInstallmentPartner'
+                      $ref: '#/components/schemas/PosInstallmentOrder'
       description: Получение списка всех POS-installments
       parameters:
         - $ref: '#/components/parameters/X-Signature'
@@ -114,13 +118,15 @@ paths:
         - $ref: '#/components/parameters/X-Request-Id'
       security:
         - Authorization: []
-  '/partner/installments/orders/{orderid}/state':
+  '/partner/installments/orders/{orderId}/state':
     parameters:
-      - schema:
-          type: integer
-        name: orderid
+      - name: orderId
         in: path
         required: true
+        schema:
+          type: string
+          example: FD-127582123
+        description: store order id
     get:
       summary: Check Order State
       tags: []
@@ -135,7 +141,7 @@ paths:
                   state:
                     $ref: '#/components/schemas/InstallmentOrderState'
                   totalAmount:
-                    $ref: ./schemas/Amount.v1.yaml
+                    $ref: '#/components/schemas/Amount'
                   storeOrderId:
                     type: string
                 required:
@@ -169,13 +175,9 @@ paths:
         - $ref: '#/components/parameters/X-Merchant-Id'
         - $ref: '#/components/parameters/X-Request-Id'
       description: Получение состояния ранее созданной заявки на оформление покупки частями (pull модель вместо callback push модели)
-  '/partner/installments/orders/{orderid}/state/sent':
+  '/partner/installments/orders/{orderId}/state/sent':
     parameters:
-      - schema:
-          type: integer
-        name: orderid
-        in: path
-        required: true
+      - $ref: '#/components/parameters/orderId'
     post:
       summary: Notify that Order is sent
       operationId: post-partner-installments-orders-orderid-state-sent
@@ -222,13 +224,15 @@ paths:
                   format: date-time
               required:
                 - sentAt
-  '/partner/installments/orders/{orderid}/state/cancelled':
+  '/partner/installments/orders/{orderId}/state/cancelled':
     parameters:
-      - schema:
-          type: string
-        name: orderid
+      - name: orderId
         in: path
         required: true
+        schema:
+          type: string
+          example: FD-127582123
+        description: store order id
     post:
       summary: Cancel Order
       operationId: post-partner-installments-orders-orderid-state-cancelled
@@ -261,13 +265,9 @@ paths:
         '500':
           description: Internal Server Error
       description: Заказ может быть отменен только в статусе WAITING_DELIVERY
-  '/partner/installments/orders/{orderid}/state/returned':
+  '/partner/installments/orders/{orderId}/state/returned':
     parameters:
-      - schema:
-          type: string
-        name: orderid
-        in: path
-        required: true
+      - $ref: '#/components/parameters/orderId'
     post:
       summary: Return goods
       operationId: post-partner-installments-orders-orderid-state-returned
@@ -312,23 +312,20 @@ paths:
                   type: string
                   format: date-time
                 returnAmount:
-                  $ref: ./schemas/Amount.v1.yaml
+                  $ref: '#/components/schemas/Amount'
                 vatAmount:
-                  $ref: ./schemas/Amount.v1.yaml
+                  $ref: '#/components/schemas/Amount'
               required:
                 - storeReturnId
                 - returnedAt
                 - returnAmount
       description: Возврат товара возможен только в течение 14 дней с даты отправки заказа (sentAt)
-  '/partner/installments/orders/{orderid}/guaranteeLetter':
+  '/partner/installments/orders/{orderId}/guaranteeLetter':
     parameters:
-      - schema:
-          type: integer
-        name: orderid
-        in: path
-        required: true
+      - $ref: '#/components/parameters/orderId'
     get:
       summary: GET Guarantee Letter
+      description: GET Guarantee Letter
       tags: []
       responses:
         '200':
@@ -397,7 +394,7 @@ paths:
                             type: string
                             format: date
                           invoiceAmount:
-                            $ref: ./schemas/Amount.v1.yaml
+                            $ref: '#/components/schemas/Amount'
                       paymentDestination:
                         type: object
                         properties:
@@ -427,7 +424,7 @@ paths:
                             type: string
                             description: дата заключения договора
                           creditAmount:
-                            $ref: ./schemas/Amount.v1.yaml
+                            $ref: '#/components/schemas/Amount'
                           productTypes:
                             type: string
                             description: '"БР" ????'
@@ -486,31 +483,43 @@ components:
       description: Universal Error
       type: object
       properties:
-        errorCode:
+        code:
           type: integer
           exclusiveMinimum: 0
-        name:
+        type:
           type: string
-        description:
+        message:
           type: string
+        causes:
+          type: array
+          items:
+            type: string
       required:
-        - errorCode
-        - name
-    PosInstallmentPartner:
-      title: PosInstallmentPartner
+        - code
+        - type
+    PosInstallmentOrder:
+      title: PosInstallmentOrder
       type: object
       properties:
         installmentId:
           type: integer
+          exclusiveMinimum: 0
         status:
           $ref: '#/components/schemas/InstallmentOrderState'
         totalAmount:
-          $ref: ./schemas/Amount.v1.yaml
+          $ref: '#/components/schemas/Amount'
         totalPeriods:
           type: integer
+          exclusiveMinimum: 1
+          maximum: 24
+        totalParts:
+          type: integer
+          exclusiveMinimum: 1
+          maximum: 24
       required:
         - installmentId
         - status
+        - totalPeriods
     Product:
       title: Product
       type: object
@@ -519,16 +528,21 @@ components:
         name:
           type: string
         totalAmount:
-          $ref: ./schemas/Amount.v1.yaml
+          $ref: '#/components/schemas/Amount'
         count:
           type: integer
-          exclusiveMinimum: 0
+          maximum: 10
+          minimum: 1
+          format: int32
+          example: 1
         category:
           type: string
+          example: Телевізори
       required:
         - name
         - totalAmount
         - count
+        - category
     StoreOrder:
       title: StoreOrder
       type: object
@@ -536,7 +550,7 @@ components:
         storeId:
           type: string
           description: Идентификатор торговой точки внутри сети партнера
-        orderNumber:
+        orderId:
           type: string
           description: Уникальный идентификатор транзакции на стороне магазина. Нужен для отсечения дублиикатов
         invoiceNumber:
@@ -556,7 +570,8 @@ components:
             - STORE
             - INTERNET
       required:
-        - orderNumber
+        - storeId
+        - orderId
         - invoiceNumber
         - createdAt
         - products
@@ -567,72 +582,42 @@ components:
       pattern: '^380\d{9}$'
       minLength: 12
       maxLength: 12
-    PANLast4Digits:
-      type: string
-      title: PANLast4Digits
-      pattern: '^\d{4}$'
-      minLength: 4
-      maxLength: 4
+      example: '380669998877'
     InstallmentOrderState:
       type: string
       title: InstallmentOrderState
       enum:
-        - WAITING_DELIVERY
         - ACTIVE
         - CLOSED
         - CLIENT_CANCELLED
         - BANK_REJECTED
         - WAITING_CLIENT_APPROVAL
         - STORE_CANCELLED
-    PartnerTurnoverReport:
-      title: PartnerTurnoverReport
+        - WAITING_DELIVERY
+    Amount:
       type: object
       properties:
-        orderId:
-          type: string
-          description: Идентификатор ПЧ
-        commission:
-          $ref: ./schemas/Amount.v1.yaml
-        commissionPercent:
-          type: integer
+        value:
+          type: number
+          format: double
           minimum: 0
-          description: '% комиссии'
-        invoiceId:
+          maximum: 10000
+        currency:
           type: string
-          description: № счета фактуры
-        invoiceDate:
-          type: string
-          format: date
-          description: 'Дата счета фактуры. Формат: yyyy-MM-dd'
-        odbContractNumber:
-          type: string
-          description: Номер кредитного договора
-        operationDateTime:
-          type: string
-          format: date-time
-        payParts:
-          type: integer
-          minimum: 1
-        totalAmount:
-          $ref: ./schemas/Amount.v1.yaml
-        transferredAmount:
-          $ref: ./schemas/Amount.v1.yaml
+          enum:
+            - UAH
+            - USD
+            - EUR
+          example: UAH
+          minLength: 3
+          maxLength: 3
       required:
-        - orderId
-        - commission
-        - commissionPercent
-        - invoiceId
-        - invoiceDate
-        - odbContractNumber
-        - operationDateTime
-        - payParts
-        - totalAmount
-        - transferredAmount
+        - value
+        - currency
   securitySchemes:
     Authorization:
       type: http
       scheme: bearer
-      in: header
       description: ''
   parameters:
     X-Merchant-Id:
@@ -640,7 +625,9 @@ components:
       in: header
       required: true
       schema:
-        type: string
+        type: integer
+        example: 7654
+        format: int32
       description: 'ID мерчанта - юридического лица, с которым заключен договор'
     X-Signature:
       name: X-Signature
@@ -649,6 +636,7 @@ components:
       schema:
         type: string
         format: binary
+        example: dGVzdCBzdHJpbmcgdG8gZGVtb25zdHJhdGUgYmFzZTY0
       description: See docs
     X-Request-Id:
       name: X-Request-Id
@@ -657,6 +645,16 @@ components:
       schema:
         type: string
         format: uuid
+        example: 7529ffdf-363f-7ad7-56c8-04f1d09ddece
       description: Random UUID
+    orderId:
+      name: orderId
+      in: path
+      schema:
+        type: string
+        example: '7582123'
+      description: order id returned at Createdorder
+      style: label
+      required: true
 security:
   - Authorization: []
