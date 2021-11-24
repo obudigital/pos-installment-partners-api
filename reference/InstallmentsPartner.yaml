@@ -32,8 +32,9 @@ paths:
                 type: object
                 properties:
                   orderId:
-                    type: integer
+                    type: string
                     description: ID заказа в Банке
+                    format: uuid
                 required:
                   - orderId
         '400':
@@ -338,18 +339,13 @@ paths:
                   header:
                     type: object
                     properties:
-                      requestId:
+                      guaranteeDocumentId:
                         type: string
                         description: '???'
-                      answerDatetime:
+                      guaranteeDocumentDate:
                         type: string
                         format: date-time
                         description: '???'
-                      fromOrganization:
-                        type: string
-                      organizationId:
-                        type: string
-                        description: digits. налоговый id или по нашей системе?
                   expansion:
                     type: object
                     properties:
@@ -362,31 +358,64 @@ paths:
                             type: string
                           middleName:
                             type: string
-                          docType:
+                          taxId:
                             type: string
-                            description: '????'
-                          docSeries:
-                            type: string
-                            minLength: 2
-                            maxLength: 2
-                          docNumber:
-                            type: string
-                            pattern: '^[0-9]{6}$'
-                            minLength: 6
-                            maxLength: 6
-                          docIssued:
-                            type: string
-                            description: кем выдан
-                          docDateOfIssue:
-                            type: string
-                            format: date
-                          INN:
-                            type: string
-                            pattern: '^[0-9]{10}$'
+                            pattern: '^\d{10}$'
                             minLength: 10
                             maxLength: 10
+                          passport:
+                            type: object
+                            description: Бумажный паспорт
+                            properties:
+                              series:
+                                type: string
+                                pattern: '^\s{2}$'
+                                example: AA
+                              number:
+                                type: string
+                                pattern: ^
+                              issueDate:
+                                type: string
+                                format: date
+                                example: '2020-12-28'
+                              issuer:
+                                type: string
+                            required:
+                              - series
+                              - number
+                              - issueDate
+                              - issuer
+                          biometric:
+                            type: object
+                            description: ID карта или биометрика
+                            properties:
+                              number:
+                                type: string
+                              issuer:
+                                type: string
+                              issueDate:
+                                type: string
+                              issueDate - copy:
+                                type: string
+                              validUntil:
+                                type: string
+                            required:
+                              - number
+                              - issuer
+                              - issueDate
+                              - issueDate - copy
+                              - validUntil
+                        required:
+                          - lastName
+                          - firstName
+                          - middleName
+                          - taxId
                       invoice:
                         type: object
+                        required:
+                          - invoiceId
+                          - invoiceDate
+                          - invoiceAmount
                         properties:
                           invoiceId:
                             type: string
@@ -397,56 +426,74 @@ paths:
                             $ref: '#/components/schemas/Amount'
                       paymentDestination:
                         type: object
+                        required:
+                          - merchantIpn
+                          - merchantIban
+                          - merchantName
                         properties:
-                          destId:
+                          merchantIpn:
                             type: string
                             description: digits ??
-                          destName:
+                          merchantIban:
+                            type: string
+                            pattern: '^[0-9]*$'
+                          merchantName:
                             type: string
                             description: кому платить (юр лицо партнера)
-                          destMFO:
+                          merchantMfo:
                             type: string
                             minLength: 6
                             maxLength: 6
                             pattern: '^[0-9]{6}$'
-                          destBankName:
+                          merchantBankName:
                             type: string
-                          destAccNumber:
-                            type: string
-                            pattern: '^[0-9]*$'
                       bank:
                         type: object
+                        required:
+                          - agreementNumber
+                          - agreementDate
+                          - creditAmount
+                          - availablePartsCount
+                          - bankId
+                          - bankName
+                          - bankExecutive
+                          - bankMFO
                         properties:
-                          agreement:
+                          agreementNumber:
                             type: string
-                            description: код договора
+                            description: номер договора
                           agreementDate:
                             type: string
                             description: дата заключения договора
+                            format: date-time
                           creditAmount:
                             $ref: '#/components/schemas/Amount'
                           productTypes:
                             type: string
                             description: '"БР" ????'
+                            example: Р
                           availablePartsCount:
                             type: integer
                             minimum: 1
                           bankId:
                             type: string
-                            pattern: '^[0-9]*$'
-                            description: '???? например 21133352'
+                            pattern: '^(\d{8})$'
+                            description: ЄДРПОУ
+                            example: '21685166'
                           bankName:
                             type: string
+                            example: OTP
                           bankExecutive:
                             type: string
-                      sign:
-                        type: string
-                        pattern: '0[xX][0-9a-fA-F]+'
-                        description: hex
-                      stamp:
-                        type: string
-                        pattern: '0[xX][0-9a-fA-F]+'
-                        description: hex
+                            example: Клименко О.В.
+                          bankMFO:
+                            type: string
+                            description: МФО Банка
+                            pattern: '^(\d{6})$'
+                    required:
+                      - invoice
+                      - paymentDestination
+                      - bank
             application/xml:
               schema:
                 type: object
@@ -652,7 +699,7 @@ components:
       in: path
       schema:
         type: string
-        example: '7582123'
+        format: uuid
       description: order id returned at Createdorder
       style: label
       required: true
