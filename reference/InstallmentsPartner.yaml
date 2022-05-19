@@ -418,8 +418,11 @@ paths:
                               - validUntil
                         required:
                           - firstName
+<<<<<<< HEAD
                           - lastName
                           - phoneNumber
+=======
+>>>>>>> b2bc0e57eb7fe22efadb4c5233ba22e712d4bea0
                           - taxId
                       invoice:
                         type: object
