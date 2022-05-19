@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Partner API for POS Installments
-  version: '1.0'
+  version: '1.2'
   summary: Partner API for POS Installments
   description: Partner API for POS Installments
   contact:
@@ -145,10 +145,14 @@ paths:
                     $ref: '#/components/schemas/Amount'
                   storeOrderId:
                     type: string
+                  orderId:
+                    type: string
+                    format: uuid
                 required:
                   - state
                   - totalAmount
                   - storeOrderId
+                  - orderId
         '400':
           description: Bad Request
           content:
@@ -312,6 +316,7 @@ paths:
                 returnedAt:
                   type: string
                   format: date-time
+                  example: '2019-08-24T14:15:22.543Z'
                 returnAmount:
                   $ref: '#/components/schemas/Amount'
                 vatAmount:
@@ -341,23 +346,28 @@ paths:
                     properties:
                       guaranteeDocumentId:
                         type: string
-                        description: '???'
-                      guaranteeDocumentDate:
+                        description: ID документа в середине банка
+                      guaranteeDocumentCreatedAt:
                         type: string
                         format: date-time
-                        description: '???'
+                        description: Дата и вермя создания документа
+                    required:
+                      - guaranteeDocumentId
+                      - guaranteeDocumentCreatedAt
                   expansion:
                     type: object
                     properties:
                       customer:
                         type: object
                         properties:
-                          lastName:
-                            type: string
                           firstName:
                             type: string
                           middleName:
                             type: string
+                          lastName:
+                            type: string
+                          phoneNumber:
+                            $ref: '#/components/schemas/TelephoneNumber'
                           taxId:
                             type: string
                             pattern: '^\d{10}$'
@@ -395,20 +405,21 @@ paths:
                                 type: string
                               issueDate:
                                 type: string
-                              issueDate - copy:
-                                type: string
+                                format: date
+                                example: '2020-01-28'
                               validUntil:
                                 type: string
+                                format: date
+                                example: '2030-01-28'
                             required:
                               - number
                               - issuer
                               - issueDate
-                              - issueDate - copy
                               - validUntil
                         required:
-                          - lastName
                           - firstName
-                          - middleName
+                          - lastName
+                          - phoneNumber
                           - taxId
                       invoice:
                         type: object
@@ -422,6 +433,7 @@ paths:
                           invoiceDate:
                             type: string
                             format: date
+                            example: '2021-12-01'
                           invoiceAmount:
                             $ref: '#/components/schemas/Amount'
                       paymentDestination:
@@ -433,7 +445,7 @@ paths:
                         properties:
                           merchantIpn:
                             type: string
-                            description: digits ??
+                            description: ЄДРПОУ
                           merchantIban:
                             type: string
                             pattern: '^[0-9]*$'
@@ -465,13 +477,10 @@ paths:
                           agreementDate:
                             type: string
                             description: дата заключения договора
-                            format: date-time
+                            format: date
+                            example: '2021-12-01'
                           creditAmount:
                             $ref: '#/components/schemas/Amount'
-                          productTypes:
-                            type: string
-                            description: '"БР" ????'
-                            example: Р
                           availablePartsCount:
                             type: integer
                             minimum: 1
@@ -589,7 +598,6 @@ components:
         - name
         - totalAmount
         - count
-        - category
     StoreOrder:
       title: StoreOrder
       type: object
@@ -607,6 +615,7 @@ components:
           type: string
           format: date-time
           description: Дата создания счета-фактуры
+          example: '2019-08-24T14:15:22.543Z'
         products:
           type: array
           items:
@@ -636,11 +645,13 @@ components:
       enum:
         - ACTIVE
         - CLOSED
-        - CLIENT_CANCELLED
+        - WAITING_BANK_APPROVAL
+        - WAITING_USER_APPROVAL
+        - CLIENT_REJECTED
         - BANK_REJECTED
-        - WAITING_CLIENT_APPROVAL
-        - STORE_CANCELLED
-        - WAITING_DELIVERY
+        - WAITING_FOR_DELIVERY
+        - DELIVERY_IN_PROGRESS
+        - PARTNER_CANCELLED
     Amount:
       type: object
       properties:
@@ -686,7 +697,7 @@ components:
         example: dGVzdCBzdHJpbmcgdG8gZGVtb25zdHJhdGUgYmFzZTY0
       description: See docs
     X-Request-Id:
-      name: X-Request-Id
+      name: X-Otp-Request-Id
       in: header
       required: true
       schema:
