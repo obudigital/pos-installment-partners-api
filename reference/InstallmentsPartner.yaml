@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Partner API for POS Installments
-  version: '1.1'
+  version: '1.2'
   summary: Partner API for POS Installments
   description: Partner API for POS Installments
   contact:
@@ -145,10 +145,14 @@ paths:
                     $ref: '#/components/schemas/Amount'
                   storeOrderId:
                     type: string
+                  orderId:
+                    type: string
+                    format: uuid
                 required:
                   - state
                   - totalAmount
                   - storeOrderId
+                  - orderId
         '400':
           description: Bad Request
           content:
@@ -356,12 +360,14 @@ paths:
                       customer:
                         type: object
                         properties:
-                          lastName:
-                            type: string
                           firstName:
                             type: string
                           middleName:
                             type: string
+                          lastName:
+                            type: string
+                          phoneNumber:
+                            $ref: '#/components/schemas/TelephoneNumber'
                           taxId:
                             type: string
                             pattern: '^\d{10}$'
@@ -411,8 +417,9 @@ paths:
                               - issueDate
                               - validUntil
                         required:
-                          - lastName
                           - firstName
+                          - lastName
+                          - phoneNumber
                           - taxId
                       invoice:
                         type: object
@@ -604,6 +611,8 @@ components:
         invoiceNumber:
           type: string
           description: Номер чека/счета фактуры
+        invoiceAmount:
+          $ref: '#/components/schemas/Amount'
         createdAt:
           type: string
           format: date-time
@@ -690,7 +699,7 @@ components:
         example: dGVzdCBzdHJpbmcgdG8gZGVtb25zdHJhdGUgYmFzZTY0
       description: See docs
     X-Request-Id:
-      name: X-Request-Id
+      name: X-Otp-Request-Id
       in: header
       required: true
       schema:
