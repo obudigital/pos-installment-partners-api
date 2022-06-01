@@ -418,11 +418,8 @@ paths:
                               - validUntil
                         required:
                           - firstName
-<<<<<<< HEAD
                           - lastName
                           - phoneNumber
-=======
->>>>>>> b2bc0e57eb7fe22efadb4c5233ba22e712d4bea0
                           - taxId
                       invoice:
                         type: object
@@ -614,6 +611,8 @@ components:
         invoiceNumber:
           type: string
           description: Номер чека/счета фактуры
+        invoiceAmount:
+          $ref: '#/components/schemas/Amount'
         createdAt:
           type: string
           format: date-time
