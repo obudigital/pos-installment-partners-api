@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Partner API for POS Installments
-  version: '1.3'
+  version: '1.4'
   summary: Partner API for POS Installments
   description: Partner API for POS Installments
   contact:
@@ -10,7 +10,9 @@ info:
 servers:
   - url: 'http://test.obudev.in'
     description: Test
-  - url: 'http://api.otpbank.com.ua:8080'
+  - url: 'http://api-dev.otpbank.com.ua'
+    description: Stage
+  - url: 'http://api.otpbank.com.ua'
     description: Prod
 paths:
   /partner/installments/orders:
@@ -66,35 +68,10 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                phoneNumber:
-                  $ref: '#/components/schemas/TelephoneNumber'
-                storeOrder:
-                  $ref: '#/components/schemas/StoreOrder'
-                totalAmount:
-                  $ref: '#/components/schemas/Amount'
-                vatAmount:
-                  $ref: '#/components/schemas/Amount'
-                periodsChosen:
-                  type: integer
-                  maximum: 24
-                  exclusiveMinimum: 1
-                  example: 6
-                onSuccessCallbackURI:
-                  type: string
-                  format: uri-reference
-                  description: 'URI в разрешенном базовом домене, привязнному к аккаунту партнера. Может отличаться между средами production и testing'
-                  example: /path/to/success
-                onFailCallbackURI:
-                  type: string
-                  format: uri-reference
-                  example: /path/to/failed
-              required:
-                - phoneNumber
-                - storeOrder
-                - totalAmount
-                - periodsChosen
+              $ref: '#/components/schemas/PosInstalmentOrderRequest'
+          application/vnd.obu.partners.credit+json:
+            schema:
+              $ref: '#/components/schemas/PartnerCreditOrderRequest'
         description: ''
       description: Подача заявки на оформление покупки частями
     get:
@@ -235,6 +212,61 @@ paths:
                   format: date-time
               required:
                 - sentAt
+  '/partner/installments/orders/{orderid}/state/consented':
+    parameters:
+      - $ref: '#/components/parameters/orderId'
+    post:
+      summary: Provide Customer Consent for Order
+      operationId: post-partner-installments-orders-orderid-state-cancelled
+      security:
+        - Authorization: []
+      parameters:
+        - $ref: '#/components/parameters/X-Signature'
+        - $ref: '#/components/parameters/X-Merchant-Id'
+        - $ref: '#/components/parameters/X-Request-Id'
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  x-stoplight:
+                    id: 53pi2xtfd7teg
+                  description: 6 symbols code
+                consentedAt:
+                  type: string
+                  x-stoplight:
+                    id: qoih41x0ilgp4
+                  format: date-time
+                  description: Дата та час надання згоди через передачу OTP пароля
+              required:
+                - code
+                - consentedAt
+          description: Тільки для способу отримання згоди "OTP_MESSAGE"
   '/partner/installments/orders/{orderId}/state/cancelled':
     parameters:
       - name: orderId
@@ -332,6 +364,24 @@ paths:
                 - returnedAt
                 - returnAmount
       description: Возврат товара возможен только в течение 14 дней с даты отправки заказа (sentAt)
+  '/partner/installments/orders/{orderId}/consent':
+    parameters:
+      - $ref: '#/components/parameters/X-Signature'
+      - $ref: '#/components/parameters/X-Merchant-Id'
+      - $ref: '#/components/parameters/X-Request-Id'
+      - $ref: '#/components/parameters/orderId'
+    post:
+      summary: Resend consent code to Customer
+      operationId: post-partner-installments-orders-orderId-consent
+      responses:
+        '201':
+          description: Created
+      description: |
+        Генерує новий код для підтвердження Клієнтом оформлення оплати частинами.
+
+        Обмеження: 1 запит на 60 секунд
+
+        Замовлення має бути в статусі: WAITING_USER_APPROVAL
   '/partner/installments/orders/{orderId}/guaranteeLetter':
     parameters:
       - $ref: '#/components/parameters/orderId'
@@ -703,6 +753,91 @@ components:
         - storeOrderId
         - orderId
         - isBankSigned
+    CustomerConsentMethod:
+      title: CustomerConsentMethod
+      type: string
+      enum:
+        - APP
+        - OTP_MESSAGE
+      example: OTP_MESSAGE
+    InstallmentPaymentRecipientInfo:
+      title: InstallmentPaymentRecipientInfo
+      type: object
+      properties:
+        iban:
+          type: string
+          x-stoplight:
+            id: yxaflcasrmcrp
+          minLength: 34
+          maxLength: 34
+        taxId:
+          type: string
+          description: тільки ЄДРПОУ (8 символів) або ІПН (10 символів)
+          minLength: 8
+          maxLength: 10
+        name:
+          type: string
+      required:
+        - iban
+        - taxId
+        - name
+    PosInstalmentOrderRequest:
+      title: PosInstalmentOrderRequest
+      type: object
+      properties:
+        phoneNumber:
+          $ref: '#/components/schemas/TelephoneNumber'
+        storeOrder:
+          $ref: '#/components/schemas/StoreOrder'
+        totalAmount:
+          $ref: '#/components/schemas/Amount'
+        vatAmount:
+          $ref: '#/components/schemas/Amount'
+        periodsChosen:
+          type: integer
+          maximum: 24
+          exclusiveMinimum: 1
+          example: 6
+        onSuccessCallbackURI:
+          type: string
+          format: uri-reference
+          description: 'URI в разрешенном базовом домене, привязнному к аккаунту партнера. Может отличаться между средами production и testing'
+          example: /path/to/success
+        onFailCallbackURI:
+          type: string
+          format: uri-reference
+          example: /path/to/failed
+      required:
+        - phoneNumber
+        - storeOrder
+        - totalAmount
+        - periodsChosen
+    PartnerCreditOrderRequest:
+      title: PartnerCreditOrderRequest
+      type: object
+      properties:
+        externalCustomerId:
+          type: string
+          format: uuid
+        storeOrder:
+          $ref: '#/components/schemas/StoreOrder'
+        totalAmount:
+          $ref: '#/components/schemas/Amount'
+        vatAmount:
+          $ref: '#/components/schemas/Amount'
+        periodsChosen:
+          type: integer
+        paymentRecipientInfo:
+          $ref: '#/components/schemas/InstallmentPaymentRecipientInfo'
+        customerConsentMethod:
+          $ref: '#/components/schemas/CustomerConsentMethod'
+      required:
+        - externalCustomerId
+        - storeOrder
+        - totalAmount
+        - periodsChosen
+        - paymentRecipientInfo
+        - customerConsentMethod
   securitySchemes:
     Authorization:
       type: http
@@ -742,7 +877,7 @@ components:
       schema:
         type: string
         format: uuid
-      description: order id returned at Createdorder
+      description: order id returned at Created order
       style: label
       required: true
 security:
