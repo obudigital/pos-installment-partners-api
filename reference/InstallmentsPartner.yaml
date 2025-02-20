@@ -532,6 +532,7 @@ paths:
                           - bankName
                           - bankExecutive
                           - bankMFO
+                          - iban
                         properties:
                           agreementNumber:
                             type: string
@@ -561,6 +562,12 @@ paths:
                             type: string
                             description: МФО Банка
                             pattern: '^(\d{6})$'
+                          iban:
+                            type: string
+                            description: банківський рахунок клієнта
+                            example: UA533005280000029094061342211
+                            minLength: 29
+                            maxLength: 29
                     required:
                       - invoice
                       - paymentDestination
